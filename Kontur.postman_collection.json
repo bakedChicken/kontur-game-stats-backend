@@ -1,0 +1,475 @@
+{
+	"variables": [],
+	"info": {
+		"name": "Kontur",
+		"_postman_id": "f0368319-27b4-7bfe-8755-6c8327025202",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get non existring endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 404\"] = responseCode.code === 404;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/info",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/info",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"ZOMBO HeAVen\",\n  \"gameModes\": [\n    \"TDM\",\n    \"DM\"\n  ]\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get existring endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"tests[\"name\"] = jsonData.name === \"] My P3rfect Server [\";",
+							"tests[\"gameModes\"] = arraysEqual(jsonData.gameModes, [\"DM\", \"TDM\"]);",
+							"",
+							"function arraysEqual(a, b) {",
+							"  if (a === b) return true;",
+							"  if (a === null || b === null) return false;",
+							"  if (a.length != b.length) return false;",
+							"",
+							"  // If you don't care about the order of the elements inside",
+							"  // the array, you should sort both arrays here.",
+							"",
+							"  for (var i = 0; i < a.length; ++i) {",
+							"    if (a[i] !== b[i]) return false;",
+							"  }",
+							"  return true;",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/info",
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/xml",
+						"description": ""
+					}
+				],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put endpoint 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/62.210.26.88-1337/info",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"] Snip3rs Heaven [\",\n  \"gameModes\": [\n    \"DM\",\n    \"TDM\"\n  ]\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get existring endpoint 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"tests[\"name\"] = jsonData.name === \"] Snip3rs Heaven [\";",
+							"tests[\"gameModes\"] = arraysEqual(jsonData.gameModes, [\"DM\"]);",
+							"",
+							"function arraysEqual(a, b) {",
+							"  if (a === b) return true;",
+							"  if (a === null || b === null) return false;",
+							"  if (a.length != b.length) return false;",
+							"",
+							"  // If you don't care about the order of the elements inside",
+							"  // the array, you should sort both arrays here.",
+							"",
+							"  for (var i = 0; i < a.length; ++i) {",
+							"    if (a[i] !== b[i]) return false;",
+							"  }",
+							"  return true;",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/62.210.26.88-1337/info",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get all servers",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Body has endpoint 1\"] = responseBody.has('\"endpoint\": \"167.42.23.32-1337\"');",
+							"tests[\"Body has endpoint 2\"] = responseBody.has('\"endpoint\": \"62.210.26.88-1337\"');"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/info",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put match 1 at endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/matches/2017-01-22T15:17:00Z",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \r\n\t\"map\": \"DM-MAP11\", \r\n\t\"gameMode\": \"TDM\", \r\n\t\"fragLimit\": 20, \r\n\t\"timeLimit\": 20, \r\n\t\"timeElapsed\": 56.321, \r\n\t\"scoreboard\": [ \r\n\t\t{ \r\n\t\t\t\"name\": \"Player3\", \r\n\t\t\t\"frags\": 20, \r\n\t\t\t\"kills\": 21, \r\n\t\t\t\"deaths\": 3 \r\n\t\t\t\r\n\t\t}, { \r\n\t\t\t\"name\": \"Player2\", \r\n\t\t\t\"frags\": 5, \r\n\t\t\t\"kills\": 2,\r\n\t\t\t\"deaths\": 30\r\n\t\t} \r\n\t] \r\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put match 2 at endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/matches/2017-01-22T17:17:00Z",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"fragLimit\":50,\"timeLimit\":10,\"timeElapsed\":7.3216747531302619,\"gameMode\":\"RUSH\",\"map\":\"VonRuedenville\",\"scoreboard\":[{\"name\":\"Martine\",\"frags\":20,\"kills\":2,\"deaths\":18},{\"name\":\"Bernice\",\"frags\":46,\"kills\":39,\"deaths\":38},{\"name\":\"Ladarius\",\"frags\":28,\"kills\":30,\"deaths\":4},{\"name\":\"Elsie\",\"frags\":23,\"kills\":23,\"deaths\":22},{\"name\":\"Christiana\",\"frags\":14,\"kills\":25,\"deaths\":26},{\"name\":\"Pearline\",\"frags\":14,\"kills\":5,\"deaths\":8},{\"name\":\"Malvina\",\"frags\":14,\"kills\":3,\"deaths\":46},{\"name\":\"Willard\",\"frags\":21,\"kills\":14,\"deaths\":48},{\"name\":\"Jazlyn\",\"frags\":21,\"kills\":13,\"deaths\":0},{\"name\":\"Jonathan\",\"frags\":3,\"kills\":1,\"deaths\":45},{\"name\":\"Emiliano\",\"frags\":42,\"kills\":50,\"deaths\":8},{\"name\":\"Maritza\",\"frags\":19,\"kills\":49,\"deaths\":14},{\"name\":\"Albertha\",\"frags\":39,\"kills\":7,\"deaths\":7},{\"name\":\"Kiel\",\"frags\":48,\"kills\":21,\"deaths\":27},{\"name\":\"Daniela\",\"frags\":12,\"kills\":41,\"deaths\":19},{\"name\":\"Yvonne\",\"frags\":34,\"kills\":8,\"deaths\":40},{\"name\":\"Lenore\",\"frags\":41,\"kills\":45,\"deaths\":5},{\"name\":\"Ivah\",\"frags\":8,\"kills\":5,\"deaths\":48},{\"name\":\"German\",\"frags\":24,\"kills\":48,\"deaths\":9},{\"name\":\"Baron\",\"frags\":9,\"kills\":14,\"deaths\":21},{\"name\":\"Adella\",\"frags\":48,\"kills\":10,\"deaths\":2},{\"name\":\"Dulce\",\"frags\":40,\"kills\":27,\"deaths\":35},{\"name\":\"Sedrick\",\"frags\":30,\"kills\":13,\"deaths\":1},{\"name\":\"Mason\",\"frags\":3,\"kills\":32,\"deaths\":1},{\"name\":\"Amelie\",\"frags\":0,\"kills\":44,\"deaths\":19},{\"name\":\"Dillan\",\"frags\":19,\"kills\":43,\"deaths\":26},{\"name\":\"Rene\",\"frags\":1,\"kills\":4,\"deaths\":38},{\"name\":\"Nora\",\"frags\":29,\"kills\":2,\"deaths\":15},{\"name\":\"Robyn\",\"frags\":4,\"kills\":2,\"deaths\":41},{\"name\":\"Lillie\",\"frags\":29,\"kills\":41,\"deaths\":45},{\"name\":\"Barton\",\"frags\":29,\"kills\":43,\"deaths\":0},{\"name\":\"Bridget\",\"frags\":35,\"kills\":15,\"deaths\":21},{\"name\":\"Itzel\",\"frags\":27,\"kills\":4,\"deaths\":45},{\"name\":\"Pearlie\",\"frags\":27,\"kills\":32,\"deaths\":1},{\"name\":\"Hollis\",\"frags\":10,\"kills\":12,\"deaths\":19},{\"name\":\"Alexis\",\"frags\":31,\"kills\":14,\"deaths\":39},{\"name\":\"Edyth\",\"frags\":50,\"kills\":30,\"deaths\":21},{\"name\":\"Devonte\",\"frags\":50,\"kills\":24,\"deaths\":1},{\"name\":\"Brain\",\"frags\":29,\"kills\":35,\"deaths\":39},{\"name\":\"Francis\",\"frags\":34,\"kills\":6,\"deaths\":36},{\"name\":\"Lemuel\",\"frags\":23,\"kills\":11,\"deaths\":32},{\"name\":\"Marques\",\"frags\":11,\"kills\":15,\"deaths\":13},{\"name\":\"Andy\",\"frags\":9,\"kills\":21,\"deaths\":31},{\"name\":\"Cleora\",\"frags\":32,\"kills\":24,\"deaths\":39},{\"name\":\"Percy\",\"frags\":37,\"kills\":7,\"deaths\":28},{\"name\":\"Dianna\",\"frags\":41,\"kills\":23,\"deaths\":2},{\"name\":\"Jordane\",\"frags\":21,\"kills\":11,\"deaths\":49},{\"name\":\"Norval\",\"frags\":16,\"kills\":38,\"deaths\":13},{\"name\":\"Jayce\",\"frags\":12,\"kills\":29,\"deaths\":32},{\"name\":\"Willard\",\"frags\":28,\"kills\":3,\"deaths\":30},{\"name\":\"Monroe\",\"frags\":6,\"kills\":4,\"deaths\":27},{\"name\":\"Gerardo\",\"frags\":30,\"kills\":24,\"deaths\":14},{\"name\":\"Phoebe\",\"frags\":14,\"kills\":32,\"deaths\":45},{\"name\":\"Bernard\",\"frags\":28,\"kills\":40,\"deaths\":44},{\"name\":\"Gretchen\",\"frags\":9,\"kills\":13,\"deaths\":36},{\"name\":\"Destin\",\"frags\":1,\"kills\":37,\"deaths\":27},{\"name\":\"Taylor\",\"frags\":43,\"kills\":48,\"deaths\":48},{\"name\":\"Zion\",\"frags\":9,\"kills\":12,\"deaths\":25},{\"name\":\"Brant\",\"frags\":25,\"kills\":6,\"deaths\":21},{\"name\":\"Dortha\",\"frags\":49,\"kills\":46,\"deaths\":3},{\"name\":\"Cara\",\"frags\":24,\"kills\":24,\"deaths\":21},{\"name\":\"Houston\",\"frags\":32,\"kills\":46,\"deaths\":33},{\"name\":\"Georgette\",\"frags\":43,\"kills\":40,\"deaths\":9},{\"name\":\"Roman\",\"frags\":17,\"kills\":35,\"deaths\":41},{\"name\":\"Lavinia\",\"frags\":41,\"kills\":27,\"deaths\":8},{\"name\":\"Madelynn\",\"frags\":16,\"kills\":30,\"deaths\":25},{\"name\":\"Ottilie\",\"frags\":33,\"kills\":31,\"deaths\":25},{\"name\":\"Buford\",\"frags\":37,\"kills\":21,\"deaths\":26},{\"name\":\"Benton\",\"frags\":40,\"kills\":39,\"deaths\":5},{\"name\":\"Lew\",\"frags\":2,\"kills\":14,\"deaths\":14},{\"name\":\"Clarabelle\",\"frags\":1,\"kills\":7,\"deaths\":28},{\"name\":\"Afton\",\"frags\":35,\"kills\":39,\"deaths\":20},{\"name\":\"Marlin\",\"frags\":37,\"kills\":23,\"deaths\":27},{\"name\":\"Raheem\",\"frags\":27,\"kills\":41,\"deaths\":13},{\"name\":\"Winston\",\"frags\":41,\"kills\":39,\"deaths\":35},{\"name\":\"Brenna\",\"frags\":2,\"kills\":32,\"deaths\":39},{\"name\":\"Evelyn\",\"frags\":38,\"kills\":2,\"deaths\":35},{\"name\":\"Declan\",\"frags\":1,\"kills\":27,\"deaths\":3},{\"name\":\"Judy\",\"frags\":45,\"kills\":31,\"deaths\":17},{\"name\":\"Ole\",\"frags\":17,\"kills\":4,\"deaths\":29},{\"name\":\"Denis\",\"frags\":36,\"kills\":21,\"deaths\":47},{\"name\":\"Coleman\",\"frags\":2,\"kills\":29,\"deaths\":31},{\"name\":\"Kadin\",\"frags\":14,\"kills\":40,\"deaths\":40},{\"name\":\"Franco\",\"frags\":26,\"kills\":7,\"deaths\":7},{\"name\":\"Devyn\",\"frags\":46,\"kills\":13,\"deaths\":40},{\"name\":\"Addie\",\"frags\":18,\"kills\":33,\"deaths\":27},{\"name\":\"Madyson\",\"frags\":50,\"kills\":47,\"deaths\":47},{\"name\":\"Christian\",\"frags\":32,\"kills\":32,\"deaths\":2},{\"name\":\"Darrel\",\"frags\":31,\"kills\":21,\"deaths\":26},{\"name\":\"Berta\",\"frags\":18,\"kills\":14,\"deaths\":22},{\"name\":\"Brandy\",\"frags\":6,\"kills\":49,\"deaths\":26},{\"name\":\"Dariana\",\"frags\":14,\"kills\":0,\"deaths\":9},{\"name\":\"Mya\",\"frags\":10,\"kills\":43,\"deaths\":18},{\"name\":\"Kasey\",\"frags\":16,\"kills\":45,\"deaths\":3},{\"name\":\"Chelsie\",\"frags\":13,\"kills\":10,\"deaths\":38},{\"name\":\"Bobby\",\"frags\":35,\"kills\":45,\"deaths\":19},{\"name\":\"Darian\",\"frags\":8,\"kills\":38,\"deaths\":28},{\"name\":\"Winnifred\",\"frags\":37,\"kills\":46,\"deaths\":1},{\"name\":\"Janiya\",\"frags\":26,\"kills\":45,\"deaths\":7},{\"name\":\"Rosalind\",\"frags\":29,\"kills\":19,\"deaths\":21}]}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put match 3 at endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/matches/2017-01-23T14:10:00Z",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \r\n\t\"map\": \"DM-MAP7\", \r\n\t\"gameMode\": \"DM\", \r\n\t\"fragLimit\": 20, \r\n\t\"timeLimit\": 20, \r\n\t\"timeElapsed\": 56.321, \r\n\t\"scoreboard\": [ \r\n\t\t{ \r\n\t\t\t\"name\": \"Player1\", \r\n\t\t\t\"frags\": 28, \r\n\t\t\t\"kills\": 21, \r\n\t\t\t\"deaths\": 35 \r\n\t\t\t\r\n\t\t}, { \r\n\t\t\t\"name\": \"Player2\", \r\n\t\t\t\"frags\": 5, \r\n\t\t\t\"kills\": 2,\r\n\t\t\t\"deaths\": 30\r\n\t\t}, { \r\n\t\t\t\"name\": \"412312\", \r\n\t\t\t\"frags\": 5, \r\n\t\t\t\"kills\": 2,\r\n\t\t\t\"deaths\": 30\r\n\t\t} \r\n\t] \r\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Put match 2 at endpoint 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/62.210.26.88-1337/matches/2017-01-22T15:17:10Z",
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \r\n\t\"map\": \"DM-MAP65\", \r\n\t\"gameMode\": \"TDM\", \r\n\t\"fragLimit\": 20, \r\n\t\"timeLimit\": 20, \r\n\t\"timeElapsed\": 56.321, \r\n\t\"scoreboard\": [ \r\n\t\t{ \r\n\t\t\t\"name\": \"12312\", \r\n\t\t\t\"frags\": 20, \r\n\t\t\t\"kills\": 21, \r\n\t\t\t\"deaths\": 3 \r\n\t\t\t\r\n\t\t}, { \r\n\t\t\t\"name\": \"412312\", \r\n\t\t\t\"frags\": 5, \r\n\t\t\t\"kills\": 2,\r\n\t\t\t\"deaths\": 30\r\n\t\t},\r\n\t\t{ \r\n\t\t\t\"name\": \"Player1\", \r\n\t\t\t\"frags\": 28, \r\n\t\t\t\"kills\": 21, \r\n\t\t\t\"deaths\": 35 \r\n\t\t\t\r\n\t\t}, { \r\n\t\t\t\"name\": \"Player2\", \r\n\t\t\t\"frags\": 5, \r\n\t\t\t\"kills\": 2,\r\n\t\t\t\"deaths\": 30\r\n\t\t}\r\n\t] \r\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get match at endpoint 1",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;",
+							"",
+							"var jsonData = JSON.parse(responseBody);",
+							"tests[\"Check name\"] = jsonData[\"map\"] === \"DM-TvoyaMatShluha\";"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/matches/2017-01-22T15:17:00Z",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get match at endpoint 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;",
+							"",
+							"var jsonData = JSON.parse(responseBody);",
+							"tests[\"Check name\"] = jsonData[\"map\"] === \"DM-AnusSobaki\";"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/servers/62.210.26.88-1337/matches/2017-01-22T15:17:10Z",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get recent matches",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;",
+							"",
+							"",
+							"var jsonData = JSON.parse(responseBody);",
+							"",
+							"console.log(jsonData);",
+							"",
+							"tests[\"Check first endpoint\"] = jsonData[0].endpoint === \"167.42.23.32-1337\";",
+							"tests[\"Check second endpoint\"] = jsonData[1].endpoint === \"167.42.23.32-1337\";",
+							"tests[\"Check third endpoint\"] = jsonData[2].endpoint === \"62.210.26.88-1337\";",
+							"tests[\"Check fourth endpoint\"] = jsonData[3].endpoint === \"167.42.23.32-1337\";"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/reports/recent-matches",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get best players",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"tests[\"Status code is 200\"] = responseCode.code === 200;",
+							"",
+							"",
+							"var jsonData = JSON.parse(responseBody);"
+						]
+					}
+				}
+			],
+			"request": {
+				"url": "http://localhost:8080/reports/best-players",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get player1 stats",
+			"request": {
+				"url": "http://localhost:8080/players/Player1/stats",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get popular servers",
+			"request": {
+				"url": "http://localhost:8080/reports/popular-servers",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get endpoint 1 stats",
+			"request": {
+				"url": "http://localhost:8080/servers/167.42.23.32-1337/stats",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Get endpoint 2 stats",
+			"request": {
+				"url": "http://localhost:8080/servers/62.210.26.88-1337/stats",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}

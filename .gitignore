@@ -1,0 +1,13 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/packages
+/Kontur.GameStats.Server/obj/Debug
+/Kontur.GameStats.Server/bin/Debug
+/DataGenerator/obj/Debug
+/DataGenerator/bin/Debug
+/DataGenerator/obj/Release
+/Kontur.GameStats.Server/bin/Release
+/Kontur.GameStats.Server/obj/Release
+/DataGenerator/bin/Release

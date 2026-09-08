@@ -1,0 +1,340 @@
+swagger: '2.0'
+info:
+  title: Kontur GameStats API
+  version: '1.0'
+  description: |
+    Kontur GameStats collects final game scoreboards from registered game
+    servers and exposes the resulting server, player, and leaderboard views.
+    It is an unauthenticated JSON API. JSON properties use camelCase and UTC
+    timestamps are serialized as `yyyy-MM-ddTHH:mm:ssZ`.
+
+    ## Features and service flows
+
+    ### Server registration and discovery
+    A new installation has no registered servers: `GET /servers/info` returns
+    an empty array, while an endpoint-specific info or statistics request
+    returns 404. Register a server with `PUT /servers/{endpoint}/info`, then
+    use the server-info and server-list operations to retrieve its metadata.
+    Repeating the PUT updates the stored metadata for that endpoint.
+
+    ### Match ingestion and statistics
+    Register the endpoint first. Submit each completed match with its UTC
+    start/end identifier and final scoreboard using
+    `PUT /servers/{endpoint}/matches/{timestamp}`. The ordered scoreboard is
+    significant: its first entry is the match winner. A submitted match can be
+    fetched by the same endpoint and timestamp. The service derives player
+    statistics from each player's appearances and server statistics from all
+    matches submitted for that server. These derived views are updated
+    asynchronously. Server statistics and report views refresh on a 20-second
+    cadence, so clients should tolerate a delay before reading them.
+
+    ### Leaderboards and recent activity
+    Once matches have been ingested, clients can read recent match activity,
+    qualified player rankings, and popular-server rankings. Reports are
+    precomputed derived views and are therefore also eventually consistent.
+    Before data exists, report operations return empty arrays.
+
+    The input contract assumes meaningful match values and a non-empty final
+    scoreboard; the legacy API does not expose detailed field-validation
+    errors.
+host: localhost:8080
+schemes: [http]
+basePath: /
+consumes: [application/json]
+produces: [application/json]
+tags:
+  - name: Server registration and discovery
+    description: Register servers and inspect their registered metadata.
+  - name: Match ingestion and statistics
+    description: Submit and retrieve final scoreboards, then inspect derived server statistics.
+  - name: Player statistics
+    description: Inspect statistics derived from players' submitted scoreboard entries.
+  - name: Leaderboards and recent activity
+    description: Inspect the service's derived recent-match and ranking reports.
+paths:
+  /servers/info:
+    get:
+      tags: [Server registration and discovery]
+      operationId: listServers
+      summary: List registered servers
+      responses:
+        '200':
+          description: All registered servers.
+          schema:
+            type: array
+            items: {$ref: '#/definitions/GameServer'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /servers/{endpoint}/info:
+    parameters:
+      - {$ref: '#/parameters/Endpoint'}
+    get:
+      tags: [Server registration and discovery]
+      operationId: getServerInfo
+      summary: Get server metadata
+      responses:
+        '200':
+          description: The registered metadata.
+          schema: {$ref: '#/definitions/ServerInformation'}
+        '404': {$ref: '#/responses/NotFound'}
+        '500': {$ref: '#/responses/InternalServerError'}
+    put:
+      tags: [Server registration and discovery]
+      operationId: putServerInfo
+      summary: Create or replace server metadata
+      description: Registers the endpoint when it does not already exist.
+      parameters:
+        - name: info
+          in: body
+          required: true
+          schema: {$ref: '#/definitions/ServerInformation'}
+      responses:
+        '200': {description: Metadata stored.}
+        '400': {$ref: '#/responses/BadRequest'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /servers/{endpoint}/stats:
+    parameters:
+      - {$ref: '#/parameters/Endpoint'}
+    get:
+      tags: [Match ingestion and statistics]
+      operationId: getServerStatistics
+      summary: Get aggregate server statistics
+      description: Statistics are calculated from submitted matches in background processing.
+      responses:
+        '200':
+          description: Aggregated server statistics.
+          schema: {$ref: '#/definitions/ServerStatistic'}
+        '404': {$ref: '#/responses/NotFound'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /servers/{endpoint}/matches/{timestamp}:
+    parameters:
+      - {$ref: '#/parameters/Endpoint'}
+      - {$ref: '#/parameters/Timestamp'}
+    get:
+      tags: [Match ingestion and statistics]
+      operationId: getMatch
+      summary: Get a submitted match
+      responses:
+        '200':
+          description: Match metadata and scoreboard.
+          schema: {$ref: '#/definitions/MatchInformation'}
+        '404': {$ref: '#/responses/NotFound'}
+        '500': {$ref: '#/responses/InternalServerError'}
+    put:
+      tags: [Match ingestion and statistics]
+      operationId: putMatch
+      summary: Submit a match for a registered server
+      description: |
+        The endpoint must have been registered first. A match is identified by
+        the combination of endpoint and UTC timestamp; re-submitting it does
+        not replace the stored match.
+      parameters:
+        - name: match
+          in: body
+          required: true
+          schema: {$ref: '#/definitions/MatchInformation'}
+      responses:
+        '200': {description: Match accepted.}
+        '400':
+          description: The endpoint is not registered or the request cannot be bound.
+        '500': {$ref: '#/responses/InternalServerError'}
+  /players/{name}/stats:
+    get:
+      tags: [Player statistics]
+      operationId: getPlayerStatistics
+      summary: Get aggregate player statistics
+      parameters:
+        - name: name
+          in: path
+          required: true
+          type: string
+          description: Player name. Lookup is case-insensitive.
+      responses:
+        '200':
+          description: Aggregated player statistics.
+          schema: {$ref: '#/definitions/PlayerStatistic'}
+        '404': {$ref: '#/responses/NotFound'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/recent-matches:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getRecentMatchesDefault
+      summary: Get the five most recent matches
+      responses:
+        '200': {$ref: '#/responses/RecentMatches'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/recent-matches/{count}:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getRecentMatches
+      summary: Get recent matches
+      parameters: [{$ref: '#/parameters/ReportCount'}]
+      responses:
+        '200': {$ref: '#/responses/RecentMatches'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/best-players:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getBestPlayersDefault
+      summary: Get the five highest-ranked players
+      responses:
+        '200': {$ref: '#/responses/BestPlayers'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/best-players/{count}:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getBestPlayers
+      summary: Get players ranked by kill-to-death ratio
+      parameters: [{$ref: '#/parameters/ReportCount'}]
+      responses:
+        '200': {$ref: '#/responses/BestPlayers'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/popular-servers:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getPopularServersDefault
+      summary: Get the five most popular servers
+      responses:
+        '200': {$ref: '#/responses/PopularServers'}
+        '500': {$ref: '#/responses/InternalServerError'}
+  /reports/popular-servers/{count}:
+    get:
+      tags: [Leaderboards and recent activity]
+      operationId: getPopularServers
+      summary: Get servers ranked by average matches per day
+      parameters: [{$ref: '#/parameters/ReportCount'}]
+      responses:
+        '200': {$ref: '#/responses/PopularServers'}
+        '500': {$ref: '#/responses/InternalServerError'}
+parameters:
+  Endpoint:
+    name: endpoint
+    in: path
+    required: true
+    type: string
+    pattern: '^.+-[0-9]+$'
+    description: A DNS hostname or IPv4 address, followed by a hyphen and TCP/UDP port from 1024 through 65535. This is the server's stable identifier, not a URL.
+    x-example: 167.42.23.32-1337
+  Timestamp:
+    name: timestamp
+    in: path
+    required: true
+    type: string
+    format: date-time
+    description: A parseable UTC timestamp identifying the match within its server. It is part of the match identity.
+    x-example: '2017-01-22T15:17:00Z'
+  ReportCount:
+    name: count
+    in: path
+    required: true
+    type: integer
+    format: int32
+    description: Maximum number of results. The default is 5 when omitted; values above 50 are capped at 50, and zero or negative values return an empty list.
+responses:
+  BadRequest: {description: Invalid request.}
+  NotFound: {description: Resource not found.}
+  InternalServerError: {description: Unexpected server error.}
+  RecentMatches:
+    description: Up to the requested number of matches, newest first.
+    schema:
+      type: array
+      items: {$ref: '#/definitions/RecentMatch'}
+  BestPlayers:
+    description: Up to the requested number of report entries, ordered by descending kill-to-death ratio.
+    schema:
+      type: array
+      items: {$ref: '#/definitions/BestPlayer'}
+  PopularServers:
+    description: Up to the requested number of report entries, ordered by descending average matches per day.
+    schema:
+      type: array
+      items: {$ref: '#/definitions/PopularServer'}
+definitions:
+  GameServer:
+    type: object
+    description: A registered server and its public metadata.
+    properties:
+      endpoint: {type: string, description: Stable server identifier in host-port form.}
+      info: {$ref: '#/definitions/ServerInformation'}
+  ServerInformation:
+    type: object
+    description: Metadata supplied when a server is registered.
+    properties:
+      name: {type: string, description: Human-readable server name, example: ZOMBO HeAVen}
+      gameModes:
+        type: array
+        description: Game-mode names the server advertises as supported. This is metadata and is not used to reject submitted matches.
+        items: {type: string}
+        example: [TDM, DM]
+  MatchInformation:
+    type: object
+    description: A match's settings and ordered final scoreboard. The first player is the winner.
+    properties:
+      fragLimit: {type: integer, format: int32, description: Configured frag limit for the match, example: 20}
+      timeLimit: {type: integer, format: int32, description: Configured time limit for the match, example: 20}
+      timeElapsed: {type: number, format: double, description: Actual elapsed match duration, example: 56.321}
+      gameMode: {type: string, description: Game-mode name played in the match, example: TDM}
+      map: {type: string, description: Map name played in the match, example: DM-MAP11}
+      scoreboard:
+        type: array
+        minItems: 1
+        description: Final player results ordered from winner (first) to last place. Each entry is used to update that player's aggregates.
+        items: {$ref: '#/definitions/PlayerResult'}
+  PlayerResult:
+    type: object
+    description: One player's result in final-scoreboard order.
+    properties:
+      name: {type: string, description: Player name used as the player-statistics identity, example: Player3}
+      frags: {type: integer, format: int32, description: Player's final frag count, example: 20}
+      kills: {type: integer, format: int32, description: Player's final kill count, example: 21}
+      deaths: {type: integer, format: int32, description: Player's final death count, example: 3}
+  PlayerStatistic:
+    type: object
+    description: Player aggregates across every submitted match; no player name is included in this response.
+    properties:
+      totalMatchesPlayed: {type: integer, format: int32, description: Number of submitted scoreboards containing the player.}
+      totalMatchesWon: {type: integer, format: int32, description: Matches where the player was first in the scoreboard.}
+      uniqueServers: {type: integer, format: int32, description: Number of distinct server endpoints on which the player appeared.}
+      maximumMatchesPerDay: {type: integer, format: int32, description: Largest number of the player's matches on one UTC calendar day.}
+      averageMatchesPerDay: {type: number, format: double, description: Mean number of the player's matches across UTC dates on which they played.}
+      lastMatchPlayed: {type: string, format: date-time, description: Latest submitted match timestamp for the player.}
+      averageScoreboardPercent: {type: number, format: double, description: Mean 0–100 placement percentage across scoreboards.}
+      favoriteGameMode: {type: string, description: Most frequently played game mode.}
+      favoriteServer: {type: string, description: Most frequently played server endpoint.}
+      killToDeathRatio: {type: number, format: double, description: Total kills divided by total deaths across all appearances.}
+  ServerStatistic:
+    type: object
+    description: Aggregates for matches submitted to one server.
+    properties:
+      totalMatchesPlayed: {type: integer, format: int32, description: Number of matches submitted for this server.}
+      maximumMatchesPerDay: {type: integer, format: int32, description: Largest number of submitted matches on one UTC calendar day.}
+      averageMatchesPerDay: {type: number, format: double, description: Mean matches per UTC date on which the server received a match.}
+      maximumPopulation: {type: integer, format: int32, description: Largest scoreboard size.}
+      averagePopulation: {type: number, format: double, description: Mean scoreboard size.}
+      top5GameModes:
+        type: array
+        description: Up to five most frequently submitted game-mode names, in descending occurrence order.
+        items: {type: string}
+      top5Maps:
+        type: array
+        description: Up to five most frequently submitted map names, in descending occurrence order.
+        items: {type: string}
+  RecentMatch:
+    type: object
+    description: A match in the recent-matches report.
+    properties:
+      endpoint: {type: string, description: Endpoint of the server that submitted the match.}
+      timestamp: {type: string, format: date-time, description: UTC match identifier.}
+      results: {$ref: '#/definitions/MatchInformation', description: Submitted match settings and final scoreboard.}
+  BestPlayer:
+    type: object
+    description: A player ranked in the best-players report. Players must have at least ten matches and one death.
+    properties:
+      name: {type: string, description: Ranked player's name.}
+      killToDeathRatio: {type: number, format: double, description: Player's aggregate total-kills-to-total-deaths ratio.}
+  PopularServer:
+    type: object
+    description: A server ranked in the popular-servers report.
+    properties:
+      endpoint: {type: string, description: Ranked server's endpoint.}
+      name: {type: string, description: Ranked server's registered display name.}
+      averageMatchesPerDay: {type: number, format: double, description: Server's aggregate mean matches per active UTC date.}

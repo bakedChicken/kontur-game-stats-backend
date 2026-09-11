@@ -1,62 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Kontur.GameStats.Server.Models;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace DataGenerator {
-	internal static class Serializer {
-		private static readonly JsonSerializerSettings SerializeSettings =
-			new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver(), Formatting = Formatting.Indented };
-
-		public static string Serialize(object obj) {
-			return JsonConvert.SerializeObject(obj, Formatting.None, SerializeSettings);
-		}
-	}
-
-
 	class Network {
-		private async Task<HttpResponseMessage> SendRequest(string url, string data) {
-			using (var client = new HttpClient { BaseAddress = new Uri("http://localhost:8080") }) {
-				client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+		private static readonly HttpClient Client = CreateClient();
 
-				return await client.PutAsync(url, new StringContent(data, Encoding.UTF8, "application/json")).ConfigureAwait(false);
-			}
+		private static HttpClient CreateClient() {
+			var client = new HttpClient { BaseAddress = new Uri("http://localhost:8080") };
+			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+			return client;
 		}
 
-		public async Task Put(IEnumerable<KeyValuePair<GameServer, IEnumerable<Match>>> servers) {
-			var putServersResponseTimes = new List<long>();
-			var putMatchesResponseTimes = new List<long>();
+		private long _totalSent;
+		private long _totalFailed;
 
-			var i = 0;
+		public long TotalSent => Interlocked.Read(ref _totalSent);
+		public long TotalFailed => Interlocked.Read(ref _totalFailed);
 
-			foreach (var server in servers) {
-				var data = Serializer.Serialize(server.Key.ServerInformation);
-				var watch = Stopwatch.StartNew();
-				var result = await SendRequest($"/servers/{server.Key.Endpoint}/info", data);
+		public async Task Send(Submission submission, CancellationToken token) {
+			var watch = Stopwatch.StartNew();
+			try {
+				var content = new StringContent(submission.Body, Encoding.UTF8, "application/json");
+				var response = await Client.PutAsync(submission.Url, content, token).ConfigureAwait(false);
 				watch.Stop();
-				putServersResponseTimes.Add(watch.ElapsedMilliseconds);
-				Console.WriteLine($"{++i}. Server {server.Key.Endpoint}: {result.StatusCode} {watch.ElapsedMilliseconds}");
-
-				foreach (var match in server.Value) {
-					data = Serializer.Serialize(match.MatchInformation);
-					watch = Stopwatch.StartNew();
-					
-					result = await SendRequest($"/servers/{match.MatchId.Endpoint}/matches/{match.MatchId.Timestamp:yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'}",
-						data);
-					watch.Stop();
-					putMatchesResponseTimes.Add(watch.ElapsedMilliseconds);
-					Console.WriteLine($"{++i}. Match {match.MatchId.Timestamp:yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'}: {result.StatusCode} {watch.ElapsedMilliseconds}");
-				}
+				Interlocked.Increment(ref _totalSent);
+				Console.WriteLine($"{submission.Description}: {(int) response.StatusCode} {watch.ElapsedMilliseconds}ms");
+			} catch (OperationCanceledException) when (token.IsCancellationRequested) {
+				// Shutting down; the in-flight request was cancelled on purpose.
+			} catch (Exception ex) {
+				watch.Stop();
+				Interlocked.Increment(ref _totalFailed);
+				Console.WriteLine($"{submission.Description}: FAILED {ex.GetType().Name}: {ex.Message}");
 			}
-
-			Console.WriteLine($"Servers time for graph: {string.Join(";", putServersResponseTimes)}");
-			Console.WriteLine($"Matches time for graph: {string.Join(";", putMatchesResponseTimes)}");
 		}
 	}
 }

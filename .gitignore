@@ -1,8 +1,12 @@
 .direnv
 .devenv
+result*
+*~
+/gamestats/gamestats
 log
 db
 bin
 obj
 *.db
-
+*.db-shm
+*.db-wal

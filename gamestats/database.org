@@ -1,0 +1,312 @@
+#+TITLE: Application Database
+#+PROPERTY: header-args:sqlite :db statistics_test.db
+#+PROPERTY: header-args        :results silent
+
+* Migration 01
+:PROPERTIES:
+:header-args:sqlite: :tangle migrations/001_initial.sql
+:END:
+
+** Database Setup
+
+=WAL= mode is chosen just because I think this is the right thing to do.
+
+#+BEGIN_SRC sqlite
+  PRAGMA journal_mode = WAL;
+  -- PRAGMA foreign keys = ON;
+#+END_SRC
+
+** Initial Schema
+
+We have a couple of tables. First of all, there is a server table. It uses integer as a primary key, because UUIDs in [[https://andersmurphy.com/2026/06/05/the-perils-of-uuid-primary-keys-in-sqlite.html][SQLite might have 14-16x slower performance impact]].
+
+Server model only has endpoint and metadata columns. I don't add endpoint REGEX constraint here, because I trust the application.
+
+Metadata is just a JSONB blob, which contains the server name and a list of game modes. Since we don't need to aggregate servers much, I won't be normalizing this blob and will trust the sender to include all the information we need.
+
+#+BEGIN_SRC sqlite
+  CREATE TABLE servers (
+    server_id INTEGER PRIMARY KEY,
+    endpoint TEXT NOT NULL UNIQUE,
+    metadata BLOB NOT NULL DEFAULT (json_object()),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+#+END_SRC
+
+Every server has a list of matches happened. So, there should be one-to-many collection of matches on servers.
+
+A match's identity is its server plus the UTC timestamp the client submits, so a resubmission with the same timestamp is recognized as the same match.
+
+I intentionally keep game_mode and map columns as a free text input, in case they change in the future. I also don't think it's going to be a big improvement to store them as a normalized reference to other table. But who knows...
+
+#+BEGIN_SRC sqlite
+  CREATE TABLE matches (
+    match_id INTEGER PRIMARY KEY,
+    server_id INTEGER NOT NULL REFERENCES servers,
+    timestamp TEXT NOT NULL,
+    frag_limit INTEGER NOT NULL,
+    game_mode TEXT NOT NULL,
+    map TEXT NOT NULL,
+    time_elapsed NUMERIC NOT NULL,
+    time_limit NUMERIC NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE (server_id, timestamp) ON CONFLICT IGNORE
+  );
+
+  CREATE INDEX matches_server_id_idx ON matches (server_id);
+  CREATE INDEX matches_timestamp_idx ON matches (timestamp);
+#+END_SRC
+
+Since I'll have to make aggregations across the player base, I will normalize players and write them into a separate table. The only field they have is their name. Since we don't have any other identifier, player name will be the unique.
+
+#+BEGIN_SRC sqlite
+  CREATE TABLE players (
+    player_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL COLLATE NOCASE UNIQUE ON CONFLICT IGNORE,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+#+END_SRC
+
+Every match should have a scoreboard: a list of players and their match performance. The name scoreboard is misleading, because we'll store player performance per match, not the individual scoreboards per match. Also, I won't add created_at column for each performance, because I assume it could be derived from the match time.
+
+The players' order has a meaning, and they always come sorted: first player is a winner, so that order is kept as a =position= column (0-based).
+
+#+BEGIN_SRC sqlite
+  CREATE TABLE player_performances (
+    match_id INTEGER NOT NULL REFERENCES matches,
+    player_id INTEGER NOT NULL REFERENCES players,
+    position INTEGER NOT NULL,
+    deaths INTEGER NOT NULL,
+    frags INTEGER NOT NULL,
+    kills INTEGER NOT NULL,
+    PRIMARY KEY (match_id, player_id)
+  );
+
+  CREATE INDEX player_performances_player_id_idx ON player_performances (player_id);
+#+END_SRC
+
+* Migration 02. Reading aggregations
+:PROPERTIES:
+:header-args:sqlite: :tangle migrations/002_create_reading_aggregations.sql
+:END:
+
+** Justification
+
+I tend to keep all aggregations on the database side. At least I'm trying to offload as much of aggregation to the database as possible, because I believe the database will handle it far better than my app.
+
+** Registered servers
+
+=game_servers= is used by both listing all servers and looking up one endpoint's metadata. Metadata is already stored as a JSON blob, so this view just re-packages it under the =info= key the API expects, defaulting a missing =gameModes= to an empty array rather than =null=.
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW game_servers AS
+    SELECT
+      server_id,
+      endpoint,
+      json_object(
+        'name', metadata ->> '$.name',
+        'gameModes', json(COALESCE(metadata -> '$.gameModes', json_array()))
+      ) AS info
+    FROM servers;
+#+END_SRC
+
+** Server statistics
+
+This is a complex query that calculates server statistics. But I would rather do it in the database than on the application side, because we have all the information we need on the database side. So, there's no reason not to calculate this in a database.
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW server_statistics AS
+    SELECT
+      s.server_id,
+      s.endpoint,
+      (SELECT COUNT(*) FROM matches m WHERE m.server_id = s.server_id)
+        AS total_matches_played,
+      (SELECT COALESCE(MAX(day_count), 0) FROM (
+         SELECT COUNT(*) AS day_count FROM matches m
+         WHERE m.server_id = s.server_id
+         GROUP BY date(m.timestamp)
+       )) AS maximum_matches_per_day,
+      (SELECT COALESCE(AVG(day_count), 0) FROM (
+         SELECT COUNT(*) AS day_count FROM matches m
+         WHERE m.server_id = s.server_id
+         GROUP BY date(m.timestamp)
+       )) AS average_matches_per_day,
+      (SELECT COALESCE(MAX(population), 0) FROM (
+         SELECT COUNT(*) AS population FROM matches m
+         JOIN player_performances pp USING (match_id)
+         WHERE m.server_id = s.server_id
+         GROUP BY m.match_id
+       )) AS maximum_population,
+      (SELECT COALESCE(AVG(population), 0) FROM (
+         SELECT COUNT(*) AS population FROM matches m
+         JOIN player_performances pp USING (match_id)
+         WHERE m.server_id = s.server_id
+         GROUP BY m.match_id
+       )) AS average_population,
+      (SELECT COALESCE(json_group_array(game_mode), json_array()) FROM (
+         SELECT game_mode FROM matches m WHERE m.server_id = s.server_id
+         GROUP BY game_mode ORDER BY COUNT(*) DESC, game_mode LIMIT 5
+       )) AS top_5_game_modes,
+      (SELECT COALESCE(json_group_array(map), json_array()) FROM (
+         SELECT map FROM matches m WHERE m.server_id = s.server_id
+         GROUP BY map ORDER BY COUNT(*) DESC, map LIMIT 5
+       )) AS top_5_maps
+    FROM servers s;
+#+END_SRC
+
+** Popular servers
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW popular_servers AS
+    SELECT
+      s.endpoint,
+      s.metadata ->> '$.name' AS name,
+      ss.average_matches_per_day
+    FROM servers s
+    JOIN server_statistics ss USING (server_id)
+    WHERE ss.total_matches_played > 0
+    ORDER BY ss.average_matches_per_day DESC, s.endpoint
+    LIMIT 50;
+#+END_SRC
+
+** Match details
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW match_details AS
+    SELECT
+      s.endpoint,
+      m.timestamp,
+      json_object(
+        'fragLimit', m.frag_limit,
+        'timeLimit', m.time_limit,
+        'timeElapsed', m.time_elapsed,
+        'gameMode', m.game_mode,
+        'map', m.map,
+        'scoreboard', (
+          SELECT json_group_array(
+            json_object('name', pl.name, 'frags', pp.frags, 'kills', pp.kills, 'deaths', pp.deaths)
+          )
+          FROM player_performances pp
+          JOIN players pl USING (player_id)
+          WHERE pp.match_id = m.match_id
+          ORDER BY pp.position
+        )
+      ) AS results
+    FROM matches m
+    JOIN servers s USING (server_id);
+#+END_SRC
+
+** Player statistics
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW player_statistics AS
+    SELECT
+      p.player_id,
+      p.name,
+      (SELECT COUNT(*) FROM player_performances pp WHERE pp.player_id = p.player_id)
+        AS total_matches_played,
+      (SELECT COUNT(*) FROM player_performances pp WHERE pp.player_id = p.player_id AND pp.position = 0)
+        AS total_matches_won,
+      (SELECT COUNT(DISTINCT m.server_id) FROM player_performances pp
+         JOIN matches m USING (match_id) WHERE pp.player_id = p.player_id)
+        AS unique_servers,
+      (SELECT COALESCE(MAX(day_count), 0) FROM (
+         SELECT COUNT(*) AS day_count FROM player_performances pp
+         JOIN matches m USING (match_id) WHERE pp.player_id = p.player_id
+         GROUP BY date(m.timestamp)
+       )) AS maximum_matches_per_day,
+      (SELECT COALESCE(AVG(day_count), 0) FROM (
+         SELECT COUNT(*) AS day_count FROM player_performances pp
+         JOIN matches m USING (match_id) WHERE pp.player_id = p.player_id
+         GROUP BY date(m.timestamp)
+       )) AS average_matches_per_day,
+      (SELECT MAX(m.timestamp) FROM player_performances pp
+         JOIN matches m USING (match_id) WHERE pp.player_id = p.player_id)
+        AS last_match_played,
+      (SELECT COALESCE(AVG(
+          CASE WHEN pop.population <= 1 THEN 100.0
+               ELSE (pop.population - pp2.position - 1) * 100.0 / (pop.population - 1)
+          END
+        ), 0)
+       FROM player_performances pp2
+       JOIN (SELECT match_id, COUNT(*) AS population FROM player_performances GROUP BY match_id) pop
+         USING (match_id)
+       WHERE pp2.player_id = p.player_id
+      ) AS average_scoreboard_percent,
+      (SELECT m.game_mode FROM player_performances pp JOIN matches m USING (match_id)
+       WHERE pp.player_id = p.player_id
+       GROUP BY m.game_mode ORDER BY COUNT(*) DESC, m.game_mode LIMIT 1
+      ) AS favorite_game_mode,
+      (SELECT s.endpoint FROM player_performances pp
+         JOIN matches m USING (match_id) JOIN servers s USING (server_id)
+       WHERE pp.player_id = p.player_id
+       GROUP BY s.endpoint ORDER BY COUNT(*) DESC, s.endpoint LIMIT 1
+      ) AS favorite_server,
+      (SELECT COALESCE(SUM(pp.deaths), 0) FROM player_performances pp WHERE pp.player_id = p.player_id)
+        AS total_deaths,
+      (SELECT CASE WHEN SUM(pp.deaths) > 0 THEN CAST(SUM(pp.kills) AS REAL) / SUM(pp.deaths) ELSE 0 END
+       FROM player_performances pp WHERE pp.player_id = p.player_id
+      ) AS kill_to_death_ratio
+    FROM players p;
+#+END_SRC
+
+** Best players
+
+#+BEGIN_SRC sqlite
+  CREATE VIEW best_players AS
+    SELECT name, kill_to_death_ratio
+    FROM player_statistics
+    WHERE total_matches_played >= 10 AND total_deaths >= 1
+    ORDER BY kill_to_death_ratio DESC, name
+    LIMIT 50;
+#+END_SRC
+
+* Verifying
+
+Scratch queries against =statistics_test.db=, not tangled into any migration. Run the seed block once, then any query below, to eyeball a view's shape and numbers while changing it.
+
+#+BEGIN_SRC sqlite
+  INSERT INTO servers (endpoint, metadata) VALUES
+    ('cs.net-1337', json_object('name', 'K1ll Zone', 'gameModes', json_array('TDM', 'RUSH'))),
+    ('empty.net-1337', json_object('name', 'Ghost Town', 'gameModes', json_array('DM')));
+
+  INSERT INTO matches (server_id, timestamp, frag_limit, game_mode, map, time_elapsed, time_limit) VALUES
+    (1, '2017-01-22T15:17:00Z', 20, 'TDM', 'DM-MAP11', 56.321, 20),
+    (1, '2017-01-22T16:00:00Z', 20, 'TDM', 'DM-MAP11', 40.0, 20),
+    (1, '2017-01-23T10:00:00Z', 30, 'RUSH', 'DM-MAP22', 90.0, 30);
+
+  INSERT INTO players (name) VALUES ('Player1'), ('Player2'), ('Player3');
+
+  INSERT INTO player_performances (match_id, player_id, position, deaths, frags, kills) VALUES
+    (1, 1, 0, 3, 20, 21),
+    (1, 2, 1, 8, 15, 16),
+    (2, 1, 0, 2, 18, 19),
+    (2, 2, 1, 9, 10, 11),
+    (2, 3, 2, 12, 5, 5),
+    (3, 2, 0, 4, 25, 26),
+    (3, 1, 1, 10, 12, 13);
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM game_servers;
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM server_statistics;
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM popular_servers;
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM match_details WHERE endpoint = 'cs.net-1337' AND timestamp = '2017-01-22T15:17:00Z';
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM player_statistics WHERE name = 'player1';
+#+END_SRC
+
+#+BEGIN_SRC sqlite :results value table :colnames yes
+  SELECT * FROM best_players;
+#+END_SRC

@@ -1,0 +1,37 @@
+[
+  {
+    "pname": "Bogus",
+    "version": "35.6.5",
+    "hash": "sha256-DSaftpz2NXv9k0IIK9GQd5CkYPrgvkSxruKFQSg3gbc="
+  },
+  {
+    "pname": "LiteDB",
+    "version": "3.0.1",
+    "hash": "sha256-k5zf5fZYWJDXFIm4KuC6Wx8FFZMNoR8+BfXu1LL2QBs="
+  },
+  {
+    "pname": "Microsoft.AspNetCore.JsonPatch",
+    "version": "10.0.12",
+    "hash": "sha256-gt6McrmzZRLoBv8dbi+aLPDp7n2c9q9GCbj+xTOJ+WI="
+  },
+  {
+    "pname": "Microsoft.AspNetCore.Mvc.NewtonsoftJson",
+    "version": "10.0.12",
+    "hash": "sha256-NO2A2Lk7bB3LTum3kDT1rHdjwc2nYhLRjNm0fShE0II="
+  },
+  {
+    "pname": "Newtonsoft.Json",
+    "version": "12.0.1",
+    "hash": "sha256-4Xf3RZrJomAh3jaZrEAJX3oPmOowGV8yDB9Y3h0Dw4U="
+  },
+  {
+    "pname": "Newtonsoft.Json",
+    "version": "13.0.3",
+    "hash": "sha256-hy/BieY4qxBWVVsDqqOPaLy1QobiIapkbrESm6v2PHc="
+  },
+  {
+    "pname": "Newtonsoft.Json.Bson",
+    "version": "1.0.2",
+    "hash": "sha256-ZUj6YFSMZp5CZtXiamw49eZmbp1iYBuNsIKNnjxcRzA="
+  }
+]

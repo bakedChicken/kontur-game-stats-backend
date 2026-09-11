@@ -1,0 +1,94 @@
+#+TITLE: Kontur GameStats
+
+* Project layout
+
+- =gamestats/= — the Go rewrite: an HTTP API backed by SQLite, migrations
+  tangled from =gamestats/database.org=, and its own unit and integration
+  test suite.
+- =Kontur.GameStats/= — the original .NET Framework-era implementation, kept
+  for reference.
+- =Kontur.GameStats.Modern/= — the same design ported to current .NET (ASP.NET
+  Core, LiteDB), plus =DataGenerator=, a load-generation console app used
+  against either server.
+- =openapi.yaml= — the authoritative API contract both servers implement.
+- =flake.nix= — Nix/devenv shells and buildable packages for all of the above.
+
+* Building and running
+
+All commands below run from the repository root, using Nix directly — no
+need to enter a dev shell first (though =nix develop= shells are also
+defined for interactive work; see below). Run =nix fmt= after changing any
+=.nix= file.
+
+** The Go server (=gamestats=)
+
+#+BEGIN_SRC sh
+  nix build .#gamestats && ./result/bin/gamestats
+  # or, equivalently:
+  nix run .#gamestats
+#+END_SRC
+
+Listens on =:8080= by default; override with =APP_PORT=. Persists to
+=statistics.db= in the current directory by default; override with =APP_DB=
+(e.g. =APP_DB=":memory:"= for an ephemeral run — data is lost on exit).
+Migrations are embedded in the binary and applied automatically on startup.
+
+For interactive development (editing, =go test=, =go test -bench=):
+
+#+BEGIN_SRC sh
+  nix develop .#gamestats
+  # inside the shell:
+  go test ./...
+  go test -run '^$' -bench=. .   # the SQL view/index benchmarks
+#+END_SRC
+
+=gamestats/.envrc= already runs this shell automatically via direnv if
+you =direnv allow= inside that directory.
+
+** The .NET reference server and data generator
+
+#+BEGIN_SRC sh
+  nix build .#modernized-server && ./result/bin/Server
+  # or:
+  nix run .#modernized-server
+#+END_SRC
+
+Also listens on =:8080=. For interactive .NET development:
+
+#+BEGIN_SRC sh
+  nix develop .#modernized
+  dotnet run --project Kontur.GameStats.Modern/Server
+#+END_SRC
+
+The data generator runs continuously against whichever server is listening
+on =:8080=, registering random servers and submitting random matches until
+stopped with Ctrl+C:
+
+#+BEGIN_SRC sh
+  nix run .#modernized-data-generator          # default: 8 concurrent workers
+  nix run .#modernized-data-generator -- 64    # or any worker count
+#+END_SRC
+
+** OpenAPI preview
+
+#+BEGIN_SRC sh
+  nix develop .#default
+  swagger serve openapi.yaml
+#+END_SRC
+
+* Comparing the C# and Go servers
+
+Both implement the same contract (=openapi.yaml=), so they were compared
+directly: same =DataGenerator= tool, same load, one server running at a
+time on the same machine.
+
+** Architecture
+
+The consistency-model difference is the most consequential architectural
+choice, not a performance detail: the C# design deliberately trades
+immediate consistency for offloading aggregation work to a background
+schedule, which is a reasonable choice at larger scale but means a client
+can register a server, submit a match, and read stale statistics for up to
+20 seconds. The Go rewrite recomputes statistics per-request instead
+(documented and benchmarked in =gamestats/database.org=), trading a small
+amount of read latency for never returning stale data.
